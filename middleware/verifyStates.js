@@ -2,7 +2,6 @@ const statesData = require('../model/statesData.json');
 
 const stateCodes = statesData.map(state => state.stateCode.toUpperCase());
 
-
 const verifyStates = (req, res, next) => {
     const stateParam = req.params.state.toUpperCase();
 

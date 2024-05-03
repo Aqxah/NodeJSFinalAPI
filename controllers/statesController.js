@@ -1,13 +1,13 @@
-const State = require('../model/State')
 const fs = require('fs');
+const State = require('../model/State')
 const path = require('path');
 
-const jsonFilePath = path.join(__dirname, '..', 'model', 'statesData.json');
+const getStateData = path.join(__dirname, '..', 'model', 'statesData.json');
 
 const getAllStates = async (req, res) => {
     try {
         // Read the JSON file
-        fs.readFile(jsonFilePath, 'utf8', (err, data) => {
+        fs.readFile(getStateData, 'utf8', async (err, data) => {
             if (err) {
                 console.error('Error reading file:', err);
                 return res.status(500).json({ 'error': 'Error reading JSON file' });
@@ -16,7 +16,23 @@ const getAllStates = async (req, res) => {
             try {
                 let statesData = JSON.parse(data);
                 
-                // Filter states based on contig query parameter
+                // Fetch fun facts from MongoDB
+                const funFacts = await State.find({}, { stateCode: 1, funFacts: 1 });
+
+                // Check if funFacts is defined and not empty
+                if (funFacts && funFacts.length > 0) {
+                    // Merge fun facts with statesData
+                    statesData.forEach(state => {
+                        const foundFunFacts = funFacts.find(fact => fact.stateCode === state.stateCode);
+                        if (foundFunFacts) {
+                            state.funFacts = foundFunFacts.funFacts;
+                        }
+                    });
+                } else {
+                    console.log('No fun facts found in MongoDB.');
+                }
+
+                // Filter states based on contig query parameter if provided
                 const contigParam = req.query.contig;
                 if (contigParam) {
                     if (contigParam === 'true') {
@@ -25,7 +41,8 @@ const getAllStates = async (req, res) => {
                         statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
                     }
                 }
-                // Return the states data
+
+                // Return the merged states data
                 res.json(statesData);
             } catch (error) {
                 console.error('Error parsing JSON data:', error);
