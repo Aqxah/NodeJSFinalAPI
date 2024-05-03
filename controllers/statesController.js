@@ -1,10 +1,42 @@
 const State = require('../model/State')
+const fs = require('fs');
+const path = require('path');
+
+const jsonFilePath = path.join(__dirname, '..', 'model', 'statesData.json');
 
 const getAllStates = async (req, res) => {
-        const states = await State.find();
-        if (!states || states.length === 0) return res.status(204).json({ 'message': 'No states found' });
-        res.json(states);
-}
+    try {
+        // Read the JSON file
+        fs.readFile(jsonFilePath, 'utf8', (err, data) => {
+            if (err) {
+                console.error('Error reading file:', err);
+                return res.status(500).json({ 'error': 'Error reading JSON file' });
+            }
+
+            try {
+                let statesData = JSON.parse(data);
+                
+                // Filter states based on contig query parameter
+                const contigParam = req.query.contig;
+                if (contigParam) {
+                    if (contigParam === 'true') {
+                        statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
+                    } else if (contigParam === 'false') {
+                        statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
+                    }
+                }
+                // Return the states data
+                res.json(statesData);
+            } catch (error) {
+                console.error('Error parsing JSON data:', error);
+                return res.status(500).json({ 'error': 'Error parsing JSON data' });
+            }
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
 
 const getContiguousStates = async (req, res) => {
     const isContiguous = req.query.contig === 'true';
