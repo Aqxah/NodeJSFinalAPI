@@ -271,62 +271,117 @@ const getStateAdmission = async (req, res) => {
     }
 };
 
-const addFunFact = async (req, res) => {
-    const stateCode = req.params.state.toUpperCase();
-    const { funfact } = req.body;
+const addFunFacts = async (req, res) => {
     try {
-        const state = await State.findOneAndUpdate(
-            { stateCode: stateCode },
-            { $push: { funfacts: funfact } },
-            { new: true }
-        );
-        if (!state) {
-            return res.status(404).json({ 'error': 'State not found' });
+        const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
+        const { funFacts } = req.body;
+
+        // Verify that funFacts data is provided and is an array
+        if (!funFacts || !Array.isArray(funFacts)) {
+            return res.status(400).json({ error: 'Invalid funFacts data provided' });
         }
-        res.json(state);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ 'error': 'Internal Server Error' });
+
+        // Read the statesData.json file
+        fs.readFile(getStateData, 'utf8', async (err, data) => {
+            if (err) {
+                console.error('Error reading file:', err);
+                return res.status(500).json({ error: 'Error reading JSON file' });
+            }
+
+            try {
+                const statesData = JSON.parse(data);
+
+                // Find the state in MongoDB collection
+                let state = await State.findOne({ stateCode });
+
+                if (!state) {
+                    // If state not found, create a new record with stateCode and funFacts
+                    state = new State({ stateCode, funFacts: funFacts });
+                } else {
+                    // If state found, add new fun facts to the existing ones
+                    state.funFacts = [...state.funFacts, ...funFacts];
+                }
+
+                // Save the updated state record
+                await state.save();
+
+                res.json({ message: 'Fun facts added successfully', state });
+            } catch (error) {
+                console.error('Error parsing JSON data:', error);
+                return res.status(500).json({ error: 'Error parsing JSON data' });
+            }
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
 const updateFunFact = async (req, res) => {
-    const stateCode = req.params.state.toUpperCase();
-    const { index, funfact } = req.body;
     try {
-        const state = await State.findOne({ stateCode: stateCode });
-        if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(404).json({ 'error': 'No fun facts found for this state' });
+        const { index, funFact } = req.body;
+        const stateCode = req.params.state.toUpperCase();
+
+        // Validate input
+        if (!index || isNaN(index) || !funFact) {
+            return res.status(400).json({ error: 'Both index and funFact are required.' });
         }
-        if (index < 1 || index > state.funfacts.length) {
-            return res.status(400).json({ 'error': 'Invalid index' });
+
+        // Adjust the index to be zero-based
+        const zeroBasedIndex = parseInt(index) - 1;
+
+        // Find the state in MongoDB collection
+        const state = await State.findOne({ stateCode });
+
+        if (!state || !state.funFacts || !state.funFacts[zeroBasedIndex]) {
+            return res.status(404).json({ error: 'State not found or funFact at the specified index does not exist.' });
         }
-        state.funfacts[index - 1] = funfact;
+
+        // Update the fun fact at the specified index
+        state.funFacts[zeroBasedIndex] = funFact;
+
+        // Save the updated state data back to MongoDB
         await state.save();
+
+        // Respond with the updated state data
         res.json(state);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ 'error': 'Internal Server Error' });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
 const deleteFunFact = async (req, res) => {
-    const stateCode = req.params.state.toUpperCase();
-    const { index } = req.body;
     try {
-        const state = await State.findOne({ stateCode: stateCode });
-        if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(404).json({ 'error': 'No fun facts found for this state' });
+        const { index } = req.body;
+        const stateCode = req.params.state.toUpperCase();
+
+        // Validate input
+        if (!index || isNaN(index)) {
+            return res.status(400).json({ error: 'Index is required and must be a number.' });
         }
-        if (index < 1 || index > state.funfacts.length) {
-            return res.status(400).json({ 'error': 'Invalid index' });
+
+        // Adjust the index to be zero-based
+        const zeroBasedIndex = parseInt(index) - 1;
+
+        // Retrieve the state data from MongoDB
+        const state = await State.findOne({ stateCode });
+
+        if (!state || !state.funFacts || !state.funFacts[zeroBasedIndex]) {
+            return res.status(404).json({ error: 'State not found or funFact at the specified index does not exist.' });
         }
-        state.funfacts.splice(index - 1, 1);
+
+        // Remove the fun fact at the specified index
+        state.funFacts.splice(zeroBasedIndex, 1);
+
+        // Save the updated state data back to MongoDB
         await state.save();
+
+        // Respond with the updated state data
         res.json(state);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ 'error': 'Internal Server Error' });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
@@ -338,7 +393,7 @@ module.exports = {
     getStateNickname,
     getStatePopulation,
     getStateAdmission,
-    addFunFact,
+    addFunFacts,
     updateFunFact,
     deleteFunFact
 }

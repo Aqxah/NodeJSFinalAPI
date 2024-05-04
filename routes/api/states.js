@@ -13,7 +13,7 @@ router.get('/:state/population', statesController.getStatePopulation);
 router.get('/:state/admission', statesController.getStateAdmission);
 
 // POST endpoint for adding fun facts
-router.post('/:state/funfact', statesController.addFunFact);
+router.post('/:state/funfact', statesController.addFunFacts);
 
 // PATCH endpoint for updating fun facts
 router.patch('/:state/funfact', statesController.updateFunFact);
