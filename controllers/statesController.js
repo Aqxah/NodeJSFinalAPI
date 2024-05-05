@@ -7,7 +7,7 @@ const getStateData = path.join(__dirname, '..', 'model', 'statesData.json');
 const getAllStates = async (req, res) => {
     try {
         // Fetch fun facts from MongoDB
-        const funFacts = await State.find({}, { stateCode: 1, funFacts: 1 });
+        const funfacts = await State.find({}, { stateCode: 1, funfacts: 1 });
 
         // Read the JSON file
         fs.readFile(getStateData, 'utf8', async (err, data) => {
@@ -19,13 +19,13 @@ const getAllStates = async (req, res) => {
             try {
                 let statesData = JSON.parse(data);
 
-                // Check if funFacts is defined and not empty
-                if (funFacts && funFacts.length > 0) {
+                // Check if funfacts is defined and not empty
+                if (funfacts && funfacts.length > 0) {
                     // Merge fun facts with statesData
                     statesData.forEach(state => {
-                        const foundFunFacts = funFacts.find(fact => fact.stateCode === state.stateCode);
-                        if (foundFunFacts) {
-                            state.funFacts = foundFunFacts.funFacts;
+                        const foundFunfacts = funfacts.find(fact => fact.stateCode === state.stateCode);
+                        if (foundFunfacts) {
+                            state.funfacts = foundFunfacts.funfacts;
                         }
                     });
                 } else {
@@ -76,11 +76,11 @@ const getStateByCode = async (req, res) => {
                 }
 
                 // Fetch fun facts from MongoDB for the requested state
-                const funFacts = await State.findOne({ stateCode }, { funFacts: 1 });
+                const funfacts = await State.findOne({ stateCode }, { funfacts: 1 });
 
                 // If fun facts exist, attach them to the state data
-                if (funFacts && funFacts.funFacts) {
-                    state = { ...state, funFacts: funFacts.funFacts };
+                if (funfacts && funfacts.funfacts) {
+                    state = { ...state, funfacts: funfacts.funfacts };
                 }
 
                 res.json(state);
@@ -117,15 +117,15 @@ const getRandomFunFact = async (req, res) => {
                 }
 
                 // Fetch fun facts from MongoDB for the requested state
-                const funFacts = await State.findOne({ stateCode }, { funFacts: 1 });
+                const funfacts = await State.findOne({ stateCode }, { funfacts: 1 });
 
-                if (!funFacts || !funFacts.funFacts || funFacts.funFacts.length === 0) {
+                if (!funfacts || !funfacts.funfacts || funfacts.funfacts.length === 0) {
                     return res.json({ message: 'No fun facts available for this state' });
                 }
 
                 // Select a random fun fact from the array of fun facts
-                const randomIndex = Math.floor(Math.random() * funFacts.funFacts.length);
-                const randomFunFact = funFacts.funFacts[randomIndex];
+                const randomIndex = Math.floor(Math.random() * funfacts.funfacts.length);
+                const randomFunFact = funfacts.funfacts[randomIndex];
 
                 res.json({ funFact: randomFunFact });
             } catch (error) {
@@ -271,14 +271,14 @@ const getStateAdmission = async (req, res) => {
     }
 };
 
-const addFunFacts = async (req, res) => {
+const addFunfacts = async (req, res) => {
     try {
         const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
-        const { funFacts } = req.body;
+        const { funfacts } = req.body;
 
-        // Verify that funFacts data is provided and is an array
-        if (!funFacts || !Array.isArray(funFacts)) {
-            return res.status(400).json({ error: 'Invalid funFacts data provided' });
+        // Verify that funfacts data is provided and is an array
+        if (!funfacts || !Array.isArray(funfacts)) {
+            return res.status(400).json({ error: 'Invalid funfacts data provided' });
         }
 
         // Read the statesData.json file
@@ -295,11 +295,11 @@ const addFunFacts = async (req, res) => {
                 let state = await State.findOne({ stateCode });
 
                 if (!state) {
-                    // If state not found, create a new record with stateCode and funFacts
-                    state = new State({ stateCode, funFacts: funFacts });
+                    // If state not found, create a new record with stateCode and funfacts
+                    state = new State({ stateCode, funfacts: funfacts });
                 } else {
                     // If state found, add new fun facts to the existing ones
-                    state.funFacts = [...state.funFacts, ...funFacts];
+                    state.funfacts = [...state.funfacts, ...funfacts];
                 }
 
                 // Save the updated state record
@@ -333,12 +333,12 @@ const updateFunFact = async (req, res) => {
         // Find the state in MongoDB collection
         const state = await State.findOne({ stateCode });
 
-        if (!state || !state.funFacts || !state.funFacts[zeroBasedIndex]) {
+        if (!state || !state.funfacts || !state.funfacts[zeroBasedIndex]) {
             return res.status(404).json({ error: 'State not found or funFact at the specified index does not exist.' });
         }
 
         // Update the fun fact at the specified index
-        state.funFacts[zeroBasedIndex] = funFact;
+        state.funfacts[zeroBasedIndex] = funFact;
 
         // Save the updated state data back to MongoDB
         await state.save();
@@ -367,12 +367,12 @@ const deleteFunFact = async (req, res) => {
         // Retrieve the state data from MongoDB
         const state = await State.findOne({ stateCode });
 
-        if (!state || !state.funFacts || !state.funFacts[zeroBasedIndex]) {
+        if (!state || !state.funfacts || !state.funfacts[zeroBasedIndex]) {
             return res.status(404).json({ error: 'State not found or funFact at the specified index does not exist.' });
         }
 
         // Remove the fun fact at the specified index
-        state.funFacts.splice(zeroBasedIndex, 1);
+        state.funfacts.splice(zeroBasedIndex, 1);
 
         // Save the updated state data back to MongoDB
         await state.save();
@@ -393,7 +393,7 @@ module.exports = {
     getStateNickname,
     getStatePopulation,
     getStateAdmission,
-    addFunFacts,
+    addFunfacts,
     updateFunFact,
     deleteFunFact
 }
