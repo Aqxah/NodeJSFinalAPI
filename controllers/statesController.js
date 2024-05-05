@@ -338,10 +338,10 @@ const addFunfacts = async (req, res) => {
             state.funfacts = [...new Set([...state.funfacts, ...funfacts])];
         }
 
-        // Save the updated state data to the MongoDB collection
+        // Save to MongoDB
         await state.save();
 
-        // Respond with a JSON object containing the state, stateCode, funfacts, and index
+        // JSON Response
         res.json({ state: state, stateCode: state.stateCode, funfacts: state.funfacts, id: state._id });
     } catch (error) {
         console.error('Error:', error);
@@ -370,21 +370,21 @@ const updateFunFact = async (req, res) => {
         const state = await State.findOne({ stateCode });
 
         if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(200).json({ message: `No Fun Facts found for Arizona` });
+            return res.status(404).json({ message: `No Fun Facts found for Arizona` });
         }
 
         // Check if the provided index is valid
         if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
-            return res.status(200).json({ meesage: `No Fun Fact found at that index for Kansas` });
+            return res.status(404).json({ meesage: `No Fun Fact found at that index for Kansas` });
         }
 
         // Update the fun fact at the specified index
         state.funfacts[zeroBasedIndex] = funFact;
 
-        // Save the updated state data to the MongoDB collection
+        // Save to MongoDB
         await state.save();
 
-        // Respond with the updated state data
+        // JSON Response
         res.json({
             state: {
                 state: state.state,
@@ -429,10 +429,10 @@ const deleteFunFact = async (req, res) => {
         // Remove the fun fact at the specified index
         state.funfacts.splice(zeroBasedIndex, 1);
 
-        // Save the updated state data to the MongoDB collection
+        // Save to MongoDB
         await state.save();
 
-        // Respond with the updated state data
+        // JSON Response
         res.json({
             state: {
                 state: state.state,
