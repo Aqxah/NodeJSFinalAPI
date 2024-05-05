@@ -40,7 +40,7 @@ const getAllStates = async (req, res) => {
                         statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
                     } else if (contigParam === 'false') {
                         // Filter out states other than AK and HI for non-contiguous states
-                        statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
+                        statesData = statesData.filter(state => state.stateCode !== 'AK' || state.stateCode !== 'HI');
                     }
                 }
 
@@ -85,7 +85,7 @@ const getStateByCode = async (req, res) => {
                 }
 
                 // Fetch fun facts from MongoDB for the requested state
-                const funfacts = await State.findOne({ stateCode }, { funfacts: 1 });
+                const funfacts = await State.findOne({ stateCode: state.stateCode }, { funfacts: 1 });
 
                 // If fun facts exist, attach them to the state data
                 if (funfacts && funfacts.funfacts) {
@@ -356,7 +356,7 @@ const updateFunFact = async (req, res) => {
 
         // Validate input
         if (!index || isNaN(index)) {
-            return res.status(200).json({ message: 'State fun fact index value required.' });
+            return res.status(400).json({ error: 'State fun fact index value required.' });
         }
 
         if (!funFact || typeof funFact !== 'string') {
@@ -370,12 +370,12 @@ const updateFunFact = async (req, res) => {
         const state = await State.findOne({ stateCode });
 
         if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(200).json({ message: `No Fun Facts found for Arizona` });
+            return res.status(200).json({ message: 'No Fun Facts found for Arizona' });
         }
 
         // Check if the provided index is valid
         if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
-            return res.status(200).json({ message: `No Fun Fact found at that index for Kansas` });
+            return res.status(200).json({ error: 'No Fun Fact found at that index for Kansas}' });
         }
 
         // Update the fun fact at the specified index
@@ -387,8 +387,10 @@ const updateFunFact = async (req, res) => {
         // Respond with the updated state data
         res.json({
             state: {
+                state: state.state,
                 stateCode: state.stateCode,
-                funfacts: state.funfacts
+                funfacts: state.funfacts,
+                index: state.index
             },
             message: 'Fun fact updated successfully'
         });
@@ -405,7 +407,7 @@ const deleteFunFact = async (req, res) => {
 
         // Validate input
         if (!index || isNaN(index)) {
-            return res.status(200).json({ message: 'State fun fact index value required.' });
+            return res.status(200).json({ message: 'State fun fact index value required' });
         }
 
         // Adjust the index to be zero-based
@@ -433,8 +435,10 @@ const deleteFunFact = async (req, res) => {
         // Respond with the updated state data
         res.json({
             state: {
+                state: state.state,
                 stateCode: state.stateCode,
-                funfacts: state.funfacts
+                funfacts: state.funfacts,
+                index: state.index
             },
             message: 'Fun fact deleted successfully'
         });
