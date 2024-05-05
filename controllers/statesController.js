@@ -24,9 +24,7 @@ const getAllStates = async (req, res) => {
                     // Merge fun facts with statesData
                     statesData.forEach(state => {
                         const foundFunfacts = funfacts.find(fact => fact.stateCode === state.stateCode);
-                        if (foundFunfacts) {
-                            state.funfacts = foundFunfacts.funfacts;
-                        }
+                        state.funfacts = foundFunfacts ? foundFunfacts.funfacts : [];
                     });
                 } else {
                     console.log('No fun facts found in MongoDB.');
@@ -39,8 +37,8 @@ const getAllStates = async (req, res) => {
                         // Filter out AK and HI for contiguous states
                         statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
                     } else if (contigParam === 'false') {
-                        // Filter only AK and HI for non-contiguous states
-                        statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
+                        // Filter out AK and HI for non-contiguous states
+                        statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
                     }
                 }
 
@@ -67,37 +65,36 @@ const getStateByCode = async (req, res) => {
         }
 
         // Read the statesData.json file
-        fs.readFile(getStateData, 'utf8', async (err, data) => {
-            if (err) {
-                console.error('Error reading file:', err);
-                return res.status(500).json({ 'error': 'Error reading JSON file' });
-            }
-
-            try {
-                const statesData = JSON.parse(data);
-
-                // Find the state data for the requested state code
-                let state = statesData.find(state => state.stateCode === stateCode);
-
-                // If state not found, return 404
-                if (!state) {
-                    return res.status(404).json({ message: 'State not found' });
+        const data = await new Promise((resolve, reject) => {
+            fs.readFile(getStateData, 'utf8', (err, data) => {
+                if (err) {
+                    console.error('Error reading file:', err);
+                    reject(err);
+                } else {
+                    resolve(data);
                 }
-
-                // Fetch fun facts from MongoDB for the requested state
-                const funfacts = await State.findOne({ stateCode }, { funfacts: 1 });
-
-                // If fun facts exist, attach them to the state data
-                if (funfacts && funfacts.funfacts) {
-                    state = { ...state, funfacts: funfacts.funfacts };
-                }
-
-                res.json(state);
-            } catch (error) {
-                console.error('Error parsing JSON data:', error);
-                return res.status(500).json({ 'error': 'Error parsing JSON data' });
-            }
+            });
         });
+
+        const statesData = JSON.parse(data);
+
+        // Find the state data for the requested state code
+        let state = statesData.find(state => state.stateCode === stateCode);
+
+        // If state not found, return 404
+        if (!state) {
+            return res.status(404).json({ message: 'State not found' });
+        }
+
+        // Fetch fun facts from MongoDB for the requested state
+        const funfacts = await State.findOne({ stateCode }, { funfacts: 1 });
+
+        // If fun facts exist, attach them to the state data
+        if (funfacts && funfacts.funfacts) {
+            state = { ...state, funfacts: funfacts.funfacts };
+        }
+
+        res.json(state);
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -114,37 +111,36 @@ const getRandomFunFact = async (req, res) => {
         }
 
         // Read the statesData.json file
-        fs.readFile(getStateData, 'utf8', async (err, data) => {
-            if (err) {
-                console.error('Error reading file:', err);
-                return res.status(500).json({ 'error': 'Error reading JSON file' });
-            }
-
-            try {
-                const statesData = JSON.parse(data);
-
-                // Find the state data for the requested state code
-                const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
-
-                if (!state) {
-                    return res.status(404).json({ message: 'State not found' });
+        const data = await new Promise((resolve, reject) => {
+            fs.readFile(getStateData, 'utf8', (err, data) => {
+                if (err) {
+                    console.error('Error reading file:', err);
+                    reject(err);
+                } else {
+                    resolve(data);
                 }
-
-                // Check if the state has any fun facts
-                if (!state.funfacts || state.funfacts.length === 0) {
-                    return res.status(404).json({ message: `No Fun Facts found for ${state.state}` });
-                }
-
-                // Select a random fun fact from the array of fun facts
-                const randomIndex = Math.floor(Math.random() * state.funfacts.length);
-                const randomFunFact = state.funfacts[randomIndex];
-
-                res.json({ funFact: randomFunFact });
-            } catch (error) {
-                console.error('Error parsing JSON data:', error);
-                return res.status(500).json({ 'error': 'Error parsing JSON data' });
-            }
+            });
         });
+
+        const statesData = JSON.parse(data);
+
+        // Find the state data for the requested state code
+        const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
+
+        if (!state) {
+            return res.status(404).json({ message: 'State not found' });
+        }
+
+        // Check if the state has any fun facts
+        if (!state.funfacts || state.funfacts.length === 0) {
+            return res.status(404).json({ message: `No Fun Facts found for ${state.state}` });
+        }
+
+        // Select a random fun fact from the array of fun facts
+        const randomIndex = Math.floor(Math.random() * state.funfacts.length);
+        const randomFunFact = state.funfacts[randomIndex];
+
+        res.json({ funFact: randomFunFact });
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -268,28 +264,32 @@ const getStateAdmission = async (req, res) => {
         }
 
         // Read the statesData.json file
-        fs.readFile(getStateData, 'utf8', async (err, data) => {
-            if (err) {
-                console.error('Error reading file:', err);
-                return res.status(500).json({ 'error': 'Error reading JSON file' });
-            }
-
-            try {
-                const statesData = JSON.parse(data);
-
-                // Find the state data for the requested state code
-                const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
-
-                if (!state) {
-                    return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
+        new Promise((resolve, reject) => {
+            fs.readFile(getStateData, 'utf8', (err, data) => {
+                if (err) {
+                    console.error('Error reading file:', err);
+                    reject(err);
+                } else {
+                    resolve(data);
                 }
+            });
+        })
+        .then(data => {
+            const statesData = JSON.parse(data);
 
-                // Respond with the state and admitted properties
-                res.json({ state: state.state, admitted: state.admitted });
-            } catch (error) {
-                console.error('Error parsing JSON data:', error);
-                return res.status(500).json({ 'error': 'Error parsing JSON data' });
+            // Find the state data for the requested state code
+            const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
+
+            if (!state) {
+                return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
             }
+
+            // Respond with the state and admitted properties
+            res.json({ state: state.state, admitted: state.admitted });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            res.status(500).json({ error: 'Internal server error' });
         });
     } catch (error) {
         console.error('Error:', error);
@@ -302,14 +302,13 @@ const addFunfacts = async (req, res) => {
         const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
         const { funfacts } = req.body;
 
-        // Check if funfacts data is provided
-        if (!funfacts || funfacts.length === 0) {
-            return res.status(400).json({ error: 'State fun facts value required' });
-        }
-
-        // Verify that funfacts is an array
-        if (!Array.isArray(funfacts)) {
-            return res.status(400).json({ error: 'State fun facts value must be an array' });
+        // Check if funfacts data is provided and is an array
+        if (!funfacts || !Array.isArray(funfacts) || funfacts.length === 0) {
+            if (!funfacts) {
+                return res.status(400).json({ error: 'State fun facts value required' });
+            } else if (!Array.isArray(funfacts)) {
+                return res.status(400).json({ error: 'State fun facts value must be an array' });
+            }
         }
 
         // Find the state in MongoDB collection
@@ -326,6 +325,7 @@ const addFunfacts = async (req, res) => {
         // Save the updated state data to the MongoDB collection
         await state.save();
 
+        // Respond with a JSON object containing the state and fun facts
         res.json({ message: 'Fun facts added successfully', state });
     } catch (error) {
         console.error('Error:', error);
@@ -353,7 +353,7 @@ const updateFunFact = async (req, res) => {
         // Find the state in MongoDB collection
         const state = await State.findOne({ stateCode });
 
-        if (!state || !state.funfacts) {
+        if (!state || !state.funfacts || state.funfacts.length === 0) {
             return res.status(404).json({ error: `No Fun Facts found for ${stateCode}` });
         }
 
@@ -369,7 +369,13 @@ const updateFunFact = async (req, res) => {
         await state.save();
 
         // Respond with the updated state data
-        res.json({ state, message: 'Fun fact updated successfully' });
+        res.json({
+            state: {
+                stateCode: state.stateCode,
+                funfacts: state.funfacts
+            },
+            message: 'Fun fact updated successfully'
+        });
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -393,12 +399,12 @@ const deleteFunFact = async (req, res) => {
         const state = await State.findOne({ stateCode });
 
         if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(404).json({ error: `No Fun Facts found for ${state}` });
+            return res.status(404).json({ error: `No Fun Facts found for ${stateCode}` });
         }
 
         // Check if the provided index is valid
         if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
-            return res.status(404).json({ error: `No Fun Fact found at that index for ${state}` });
+            return res.status(404).json({ error: `No Fun Fact found at that index for ${stateCode}` });
         }
 
         // Remove the fun fact at the specified index
