@@ -42,6 +42,24 @@ const getAllStates = async (req, res) => {
                     }
                 }
 
+                // Check if funfacts property exists for required states
+                const statesWithFunfacts = statesData.filter(state => ['KS', 'NE', 'OK', 'MO', 'CO'].includes(state.stateCode));
+                if (statesWithFunfacts.length !== 5) {
+                    console.error('Records for KS, NE, OK, MO and CO do not have funfacts property');
+                } else {
+                    // Check if each of these states has 3 or more fun facts
+                    const statesWithEnoughFunfacts = statesWithFunfacts.filter(state => state.funfacts && state.funfacts.length >= 3);
+                    if (statesWithEnoughFunfacts.length !== 5) {
+                        console.error('Records for KS, NE, OK, MO and CO do not have 3 or more fun facts');
+                    }
+                }
+
+                // Check if funfacts property doesn't exist for required states
+                const statesWithoutFunfacts = statesData.filter(state => ['NH', 'RI', 'GA', 'AZ', 'MT'].includes(state.stateCode));
+                if (statesWithoutFunfacts.some(state => !state.funfacts)) {
+                    console.error('Records for NH, RI, GA, AZ and MT do not have funfacts property');
+                }
+
                 // Return the merged states data
                 res.json(statesData);
             } catch (error) {
@@ -68,9 +86,15 @@ const getStateByCode = async (req, res) => {
                 const statesData = JSON.parse(data);
                 const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
 
+                // Check if the state code is valid
+                if (!isValidStateCode(stateCode)) {
+                    return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
+                }
+
                 // Find the state data for the requested state code
                 let state = statesData.find(state => state.stateCode === stateCode);
 
+                // If state not found, return 404
                 if (!state) {
                     return res.status(404).json({ message: 'State not found' });
                 }
@@ -220,13 +244,16 @@ const getStatePopulation = async (req, res) => {
                 const statesData = JSON.parse(data);
 
                 // Find the state data for the requested state code
-                const state = statesData.find(state => state.stateCode === stateCode);
+                const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
 
                 if (!state) {
-                    return res.status(404).json({ message: 'Invalid state abbreviation parameter' });
+                    return res.status(404).json({ message: 'State not found' });
                 }
 
-                res.json({ state: state.state, population: state.population });
+                // Format population with correct comma placement
+                const formattedPopulation = state.population.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+                res.json({ state: state.state, population: formattedPopulation });
             } catch (error) {
                 console.error('Error parsing JSON data:', error);
                 return res.status(500).json({ 'error': 'Error parsing JSON data' });
@@ -253,13 +280,13 @@ const getStateAdmission = async (req, res) => {
                 const statesData = JSON.parse(data);
 
                 // Find the state data for the requested state code
-                const state = statesData.find(state => state.stateCode === stateCode);
+                const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
 
                 if (!state) {
-                    return res.status(404).json({ message: 'Invalid state abbreviation parameter' });
+                    return res.status(404).json({ message: 'State not found' });
                 }
 
-                res.json({ state: state.state, admission_date: state.admission_date });
+                res.json({ state: state.state, admitted: state.admitted });
             } catch (error) {
                 console.error('Error parsing JSON data:', error);
                 return res.status(500).json({ 'error': 'Error parsing JSON data' });
@@ -271,14 +298,19 @@ const getStateAdmission = async (req, res) => {
     }
 };
 
+
 const addFunfacts = async (req, res) => {
     try {
         const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
         const { funfacts } = req.body;
 
         // Verify that funfacts data is provided and is an array
-        if (!funfacts || !Array.isArray(funfacts)) {
-            return res.status(400).json({ error: 'Invalid funfacts data provided' });
+        if (!funfacts) {
+            return res.status(400).json({ error: 'State fun facts value required' });
+        }
+
+        if (!Array.isArray(funfacts)) {
+            return res.status(400).json({ error: 'State fun facts value must be an array' });
         }
 
         // Read the statesData.json file
@@ -292,18 +324,24 @@ const addFunfacts = async (req, res) => {
                 const statesData = JSON.parse(data);
 
                 // Find the state in MongoDB collection
-                let state = await State.findOne({ stateCode });
+                let state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
 
                 if (!state) {
                     // If state not found, create a new record with stateCode and funfacts
-                    state = new State({ stateCode, funfacts: funfacts });
+                    state = { stateCode, funfacts: funfacts };
+                    statesData.push(state);
                 } else {
                     // If state found, add new fun facts to the existing ones
                     state.funfacts = [...state.funfacts, ...funfacts];
                 }
 
-                // Save the updated state record
-                await state.save();
+                // Save the updated statesData to the JSON file
+                fs.writeFile(getStateData, JSON.stringify(statesData, null, 2), 'utf8', (err) => {
+                    if (err) {
+                        console.error('Error writing to file:', err);
+                        return res.status(500).json({ error: 'Error writing to JSON file' });
+                    }
+                });
 
                 res.json({ message: 'Fun facts added successfully', state });
             } catch (error) {
@@ -323,8 +361,12 @@ const updateFunFact = async (req, res) => {
         const stateCode = req.params.state.toUpperCase();
 
         // Validate input
-        if (!index || isNaN(index) || !funFact) {
-            return res.status(400).json({ error: 'Both index and funFact are required.' });
+        if (!index || isNaN(index)) {
+            return res.status(400).json({ error: 'State fun fact index value required.' });
+        }
+
+        if (!funFact || typeof funFact !== 'string') {
+            return res.status(400).json({ error: 'State fun fact value required as a string.' });
         }
 
         // Adjust the index to be zero-based
@@ -333,8 +375,13 @@ const updateFunFact = async (req, res) => {
         // Find the state in MongoDB collection
         const state = await State.findOne({ stateCode });
 
-        if (!state || !state.funfacts || !state.funfacts[zeroBasedIndex]) {
-            return res.status(404).json({ error: 'State not found or funFact at the specified index does not exist.' });
+        if (!state || !state.funfacts) {
+            return res.status(404).json({ error: `No Fun Facts found for {$state}` });
+        }
+
+        // Check if the provided index is valid
+        if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
+            return res.status(404).json({ error: `No Fun Fact found at that index for {$state}` });
         }
 
         // Update the fun fact at the specified index
@@ -358,7 +405,7 @@ const deleteFunFact = async (req, res) => {
 
         // Validate input
         if (!index || isNaN(index)) {
-            return res.status(400).json({ error: 'Index is required and must be a number.' });
+            return res.status(400).json({ error: 'State fun fact index value required.' });
         }
 
         // Adjust the index to be zero-based
@@ -367,8 +414,12 @@ const deleteFunFact = async (req, res) => {
         // Retrieve the state data from MongoDB
         const state = await State.findOne({ stateCode });
 
-        if (!state || !state.funfacts || !state.funfacts[zeroBasedIndex]) {
-            return res.status(404).json({ error: 'State not found or funFact at the specified index does not exist.' });
+        if (!state || !state.funfacts || state.funfacts.length === 0) {
+            return res.status(404).json({ error: `No Fun Facts found for {$state}` });
+        }
+
+        if (!state.funfacts[zeroBasedIndex]) {
+            return res.status(404).json({ error: `No Fun Fact found at that index for {$state}` });
         }
 
         // Remove the fun fact at the specified index
