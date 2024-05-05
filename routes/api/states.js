@@ -5,7 +5,7 @@ const statesController = require('../../controllers/statesController');
 
 // GET endpoints
 router.get('/', statesController.getAllStates);
-router.get('/:state', verifyStates, statesController.getStateByCode);
+router.get('/:state', statesController.getStateByCode);
 router.get('/:state/funfact', statesController.getRandomFunFact);
 router.get('/:state/capital', statesController.getStateCapital);
 router.get('/:state/nickname', statesController.getStateNickname);
