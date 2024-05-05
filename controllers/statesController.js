@@ -38,26 +38,9 @@ const getAllStates = async (req, res) => {
                     if (contigParam === 'true') {
                         statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
                     } else if (contigParam === 'false') {
-                        statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
+                        // Filter out AK and HI
+                        statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
                     }
-                }
-
-                // Check if funfacts property exists for required states
-                const statesWithFunfacts = statesData.filter(state => ['KS', 'NE', 'OK', 'MO', 'CO'].includes(state.stateCode));
-                if (statesWithFunfacts.length !== 5) {
-                    console.error('Records for KS, NE, OK, MO and CO do not have funfacts property');
-                } else {
-                    // Check if each of these states has 3 or more fun facts
-                    const statesWithEnoughFunfacts = statesWithFunfacts.filter(state => state.funfacts && state.funfacts.length >= 3);
-                    if (statesWithEnoughFunfacts.length !== 5) {
-                        console.error('Records for KS, NE, OK, MO and CO do not have 3 or more fun facts');
-                    }
-                }
-
-                // Check if funfacts property doesn't exist for required states
-                const statesWithoutFunfacts = statesData.filter(state => ['NH', 'RI', 'GA', 'AZ', 'MT'].includes(state.stateCode));
-                if (statesWithoutFunfacts.some(state => !state.funfacts)) {
-                    console.error('Records for NH, RI, GA, AZ and MT do not have funfacts property');
                 }
 
                 // Return the merged states data
@@ -233,6 +216,11 @@ const getStatePopulation = async (req, res) => {
     try {
         const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
 
+        // Check if the state code matches the expected format (two letters)
+        if (!/^[A-Z]{2}$/.test(stateCode)) {
+            return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
+        }
+
         // Read the statesData.json file
         fs.readFile(getStateData, 'utf8', async (err, data) => {
             if (err) {
@@ -247,7 +235,7 @@ const getStatePopulation = async (req, res) => {
                 const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
 
                 if (!state) {
-                    return res.status(404).json({ message: 'State not found' });
+                    return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
                 }
 
                 // Format population with correct comma placement
@@ -268,6 +256,11 @@ const getStatePopulation = async (req, res) => {
 const getStateAdmission = async (req, res) => {
     try {
         const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
+
+        // Check if the state code is valid (two letters)
+        if (!/^[A-Z]{2}$/.test(stateCode)) {
+            return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
+        }
 
         // Read the statesData.json file
         fs.readFile(getStateData, 'utf8', async (err, data) => {
@@ -298,57 +291,35 @@ const getStateAdmission = async (req, res) => {
     }
 };
 
-
 const addFunfacts = async (req, res) => {
     try {
         const stateCode = req.params.state.toUpperCase(); // Convert state code to uppercase
         const { funfacts } = req.body;
 
-        // Verify that funfacts data is provided and is an array
-        if (!funfacts) {
+        // Check if funfacts data is provided
+        if (!funfacts || funfacts.length === 0) {
             return res.status(400).json({ error: 'State fun facts value required' });
         }
 
+        // Verify that funfacts is an array
         if (!Array.isArray(funfacts)) {
             return res.status(400).json({ error: 'State fun facts value must be an array' });
         }
 
-        // Read the statesData.json file
-        fs.readFile(getStateData, 'utf8', async (err, data) => {
-            if (err) {
-                console.error('Error reading file:', err);
-                return res.status(500).json({ error: 'Error reading JSON file' });
-            }
+        // Find the state in MongoDB collection
+        let state = await State.findOne({ stateCode });
 
-            try {
-                const statesData = JSON.parse(data);
+        if (!state) {
+            // If state not found, create a new record with stateCode and funfacts
+            state = new State({ stateCode, funfacts });
+            await state.save();
+        } else {
+            // If state found, add new fun facts to the existing ones
+            state.funfacts = [...state.funfacts, ...funfacts];
+            await state.save();
+        }
 
-                // Find the state in MongoDB collection
-                let state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
-
-                if (!state) {
-                    // If state not found, create a new record with stateCode and funfacts
-                    state = { stateCode, funfacts: funfacts };
-                    statesData.push(state);
-                } else {
-                    // If state found, add new fun facts to the existing ones
-                    state.funfacts = [...state.funfacts, ...funfacts];
-                }
-
-                // Save the updated statesData to the JSON file
-                fs.writeFile(getStateData, JSON.stringify(statesData, null, 2), 'utf8', (err) => {
-                    if (err) {
-                        console.error('Error writing to file:', err);
-                        return res.status(500).json({ error: 'Error writing to JSON file' });
-                    }
-                });
-
-                res.json({ message: 'Fun facts added successfully', state });
-            } catch (error) {
-                console.error('Error parsing JSON data:', error);
-                return res.status(500).json({ error: 'Error parsing JSON data' });
-            }
-        });
+        res.json({ message: 'Fun facts added successfully', state });
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -376,12 +347,12 @@ const updateFunFact = async (req, res) => {
         const state = await State.findOne({ stateCode });
 
         if (!state || !state.funfacts) {
-            return res.status(404).json({ error: `No Fun Facts found for {$state}` });
+            return res.status(404).json({ error: `No Fun Facts found for ${stateCode}` });
         }
 
         // Check if the provided index is valid
         if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
-            return res.status(404).json({ error: `No Fun Fact found at that index for {$state}` });
+            return res.status(404).json({ error: `No Fun Fact found at that index for ${stateCode}` });
         }
 
         // Update the fun fact at the specified index
@@ -415,11 +386,12 @@ const deleteFunFact = async (req, res) => {
         const state = await State.findOne({ stateCode });
 
         if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(404).json({ error: `No Fun Facts found for {$state}` });
+            return res.status(404).json({ error: `No Fun Facts found for ${stateCode}` });
         }
 
-        if (!state.funfacts[zeroBasedIndex]) {
-            return res.status(404).json({ error: `No Fun Fact found at that index for {$state}` });
+        // Check if the provided index is valid
+        if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
+            return res.status(404).json({ error: `No Fun Fact found at that index for ${stateCode}` });
         }
 
         // Remove the fun fact at the specified index
