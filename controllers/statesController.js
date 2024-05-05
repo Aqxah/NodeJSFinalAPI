@@ -37,10 +37,10 @@ const getAllStates = async (req, res) => {
                 if (contigParam !== undefined) {
                     if (contigParam === 'true') {
                         // Filter out AK and HI for contiguous states
-                        statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
+                        statesData = statesData.filter(state => state.stateCode === 'AK' && state.stateCode === 'HI');
                     } else if (contigParam === 'false') {
                         // Filter out states other than AK and HI for non-contiguous states
-                        statesData = statesData.filter(state => state.stateCode !== 'AK' || state.stateCode !== 'HI');
+                        statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
                     }
                 }
 
@@ -356,11 +356,11 @@ const updateFunFact = async (req, res) => {
 
         // Validate input
         if (!index || isNaN(index)) {
-            return res.status(400).json({ error: 'State fun fact index value required.' });
+            return res.status(200).json({ message: 'State fun fact index value required' });
         }
 
         if (!funFact || typeof funFact !== 'string') {
-            return res.status(400).json({ error: 'State fun fact value required' });
+            return res.status(200).json({ message: 'State fun fact value required' });
         }
 
         // Adjust the index to be zero-based
@@ -375,7 +375,7 @@ const updateFunFact = async (req, res) => {
 
         // Check if the provided index is valid
         if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
-            return res.status(200).json({ error: 'No Fun Fact found at that index for Kansas}' });
+            return res.status(200).json({ meesage: 'No Fun Fact found at that index for Kansas' });
         }
 
         // Update the fun fact at the specified index
