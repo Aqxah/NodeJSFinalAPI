@@ -33,9 +33,12 @@ const getAllStates = async (req, res) => {
                 // Filter states based on contig query parameter if provided
                 const contigParam = req.query.contig;
                 if (contigParam !== undefined) {
-                    if (contigParam === 'false') {
-                        // Filter out AK and HI for non-contiguous states
+                    if (contigParam === 'true') {
+                        // Filter out AK and HI for contiguous states
                         statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
+                    } else if (contigParam === 'false') {
+                        // Filter out states other than AK and HI for non-contiguous states
+                        statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
                     }
                 }
 
@@ -67,7 +70,7 @@ const getStateByCode = async (req, res) => {
                 const statesData = JSON.parse(data);
 
                 // Find the state data for the requested state code
-                const state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
+                let state = statesData.find(state => state.stateCode.toUpperCase() === stateCode);
 
                 // If state not found, check for case-insensitive match
                 if (!state) {
@@ -128,7 +131,17 @@ const getRandomFunFact = async (req, res) => {
 
                 // Check if the state has any fun facts
                 if (!state.funfacts || state.funfacts.length === 0) {
-                    return res.status(404).json({ message: `No Fun Facts found for ${state.state}` });
+                    // If no fun facts found in the JSON data, query MongoDB
+                    const funfactsFromDB = await State.findOne({ stateCode }, { funfacts: 1 });
+
+                    if (funfactsFromDB && funfactsFromDB.funfacts) {
+                        // Select a random fun fact from the array of fun facts
+                        const randomIndex = Math.floor(Math.random() * funfactsFromDB.funfacts.length);
+                        const randomFunFact = funfactsFromDB.funfacts[randomIndex];
+                        return res.json({ funFact: randomFunFact });
+                    } else {
+                        return res.status(404).json({ message: `No Fun Facts found for ${state.state}` });
+                    }
                 }
 
                 // Select a random fun fact from the array of fun facts
@@ -280,7 +293,7 @@ const getStateAdmission = async (req, res) => {
                     return res.status(400).json({ message: 'Invalid state abbreviation parameter' });
                 }
 
-                res.json({ state: state.state, admission: state.admission });
+                res.json({ state: state.state, admission: state.admission_date });
             } catch (error) {
                 console.error('Error parsing JSON data:', error);
                 return res.status(500).json({ error: 'Error parsing JSON data' });
