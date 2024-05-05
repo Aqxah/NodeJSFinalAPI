@@ -37,7 +37,7 @@ const getAllStates = async (req, res) => {
                 if (contigParam !== undefined) {
                     if (contigParam === 'true') {
                         // Filter out AK and HI for contiguous states
-                        statesData = statesData.filter(state => state.stateCode === 'AK' && state.stateCode === 'HI');
+                        statesData = statesData.filter(state => state.stateCode !== 'AK' && state.stateCode !== 'HI');
                     } else if (contigParam === 'false') {
                         // Filter out states other than AK and HI for non-contiguous states
                         statesData = statesData.filter(state => state.stateCode === 'AK' || state.stateCode === 'HI');
@@ -370,12 +370,12 @@ const updateFunFact = async (req, res) => {
         const state = await State.findOne({ stateCode });
 
         if (!state || !state.funfacts || state.funfacts.length === 0) {
-            return res.status(200).json({ message: 'No Fun Facts found for Arizona' });
+            return res.status(200).json({ message: `No Fun Facts found for Arizona` });
         }
 
         // Check if the provided index is valid
         if (zeroBasedIndex < 0 || zeroBasedIndex >= state.funfacts.length) {
-            return res.status(200).json({ meesage: 'No Fun Fact found at that index for Kansas' });
+            return res.status(200).json({ meesage: `No Fun Fact found at that index for Kansas` });
         }
 
         // Update the fun fact at the specified index
